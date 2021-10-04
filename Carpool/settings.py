@@ -106,12 +106,11 @@ AUTH_USER_MODEL = 'authapp.User'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': env('DB_NAME'),
+        'ENGINE': env('DB_ENGINE'), # Using MySQL locally, PostgreSQL on heroku
 	    'USER': env('DB_USER'),
 	    'PASSWORD': env('DB_PASSWORD'),
-	    'HOST': 'localhost',
-	    'PORT': '3306',
+	    'HOST': env('DB_HOST'),
+	    'PORT': env('DB_PORT'),
     }
 }
 
