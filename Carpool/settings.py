@@ -49,7 +49,8 @@ INSTALLED_APPS = [
 
     # third party apps
     'rest_framework',
-     'corsheaders',
+    'corsheaders',
+    'drf_yasg',
 
     'authapp',
     'carpoolapp',
