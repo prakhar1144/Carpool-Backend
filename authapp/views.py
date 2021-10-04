@@ -1,3 +1,4 @@
+from drf_spectacular.types import OpenApiTypes
 import jwt, datetime
 
 from rest_framework.views import APIView
@@ -11,6 +12,7 @@ from django.contrib.auth import authenticate
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import AllowAny
 from .serializers import RegisterSerializer
+from drf_spectacular.utils import OpenApiExample, extend_schema, OpenApiParameter, OpenApiResponse
 
 def create_email(request, user, subject):
     
@@ -67,6 +69,10 @@ class VerifyEmailAPIView(APIView):
         except jwt.DecodeError:
             return Response({"message": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
 
+@extend_schema(request=RegisterSerializer, description='Login Using Email-Pass to get Token', responses={
+            200: OpenApiResponse(response=OpenApiTypes.STR , description='A JWT Token'),
+            404: OpenApiResponse(response=OpenApiTypes.STR , description='Error Message')
+        })
 class LoginAPIView(APIView):
     permission_classes = (AllowAny,)
     
@@ -79,7 +85,7 @@ class LoginAPIView(APIView):
         print(user)
         if user is not None:
             token = user.get_token()
-            return Response(token, status.HTTP_202_ACCEPTED)
+            return Response(token, status.HTTP_200_OK)
         else:
             return Response({"Message":"Invalid email/Pass"}, status.HTTP_404_NOT_FOUND)
 
