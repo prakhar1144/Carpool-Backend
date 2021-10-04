@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     # third party apps
     'rest_framework',
     'corsheaders',
-    'drf_yasg',
+    'drf_spectacular',
 
     'authapp',
     'carpoolapp',
@@ -92,6 +92,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES' : [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 from datetime import timedelta
@@ -171,3 +172,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:9000",
 ]
 '''
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Carpool API',
+    'DESCRIPTION': 'End Points for Carpool App',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+
+}
