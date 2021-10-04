@@ -107,6 +107,7 @@ AUTH_USER_MODEL = 'authapp.User'
 DATABASES = {
     'default': {
         'ENGINE': env('DB_ENGINE'), # Using MySQL locally, PostgreSQL on heroku
+        'NAME' : env('DB_NAME'),
 	    'USER': env('DB_USER'),
 	    'PASSWORD': env('DB_PASSWORD'),
 	    'HOST': env('DB_HOST'),
