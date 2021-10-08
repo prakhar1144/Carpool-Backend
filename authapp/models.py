@@ -29,7 +29,6 @@ class CustomUserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin):
     # username = models.CharField(max_length=12, unique=True, db_index=True, validators=[MinLengthValidator(3,"Minimum Lenth should be 3")])
     email = models.EmailField(unique=True)
-    is_verified = models.BooleanField(default=False)
 
     # Fields used by the Django admin.
     is_active = models.BooleanField(default=True)

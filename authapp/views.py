@@ -1,118 +1,167 @@
+from os import stat
 from drf_spectacular.types import OpenApiTypes
 import jwt, datetime
 
 from rest_framework.views import APIView
+from rest_framework.generics import GenericAPIView
 from Carpool import settings
 from django.urls import reverse
 from django.contrib.sites.shortcuts import get_current_site
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from .models import User
 from django.contrib.auth import authenticate
-from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import AllowAny
-from .serializers import RegisterSerializer
+from .serializers import CreateAccountSerializer, ForgotPasswordSerializer, SignUpSerializer, LoginSerializer
 from drf_spectacular.utils import OpenApiExample, extend_schema, OpenApiParameter, OpenApiResponse
 
-def create_email(request, user, subject):
-    
-    token = jwt.encode(
-        {"user_id": user.id, "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=86400), "subject": subject},
-        settings.SECRET_KEY, algorithm="HS256")
 
-    current_site = get_current_site(request).domain
-    relative_link = reverse("mail-verification")
-    abs_url = 'http://' + current_site + relative_link + "?token=" + str(token)
-
-    email_body = 'Hi ' + user.email + ' Use link below ' + abs_url
-    data = {
-        'email_subject': subject,
-        'email_body': email_body,
-        'email': user.email
-    }
-    return data
-
-class RegisterAPIView(CreateAPIView):
+class CreateAccountAPIView(GenericAPIView):
+    '''
+    Click on the link received on mail after signUp to create an account.
+    '''
     permission_classes = (AllowAny,)
     queryset = User.objects.all()
-    serializer_class = RegisterSerializer
+    serializer_class = CreateAccountSerializer
 
-    def perform_create(self, serializer):
-        serializer.save() # Modelserializer createMethod is called
-        print("ok")
-        user = User.objects.get(email=serializer.data['email'])
-
-        data = create_email(self.request, user, "New Account")
-        print(data)
-        #send_email_task.delay(data)
-        return Response({"message":"verify your mail"}, status=status.HTTP_201_CREATED)
-
-class VerifyEmailAPIView(APIView):
-    permission_classes = (AllowAny,)
+    @extend_schema(parameters=[
+        OpenApiParameter('token', type=OpenApiTypes.STR, required=True)
+    ])
     def get(self, request):
         token = request.GET.get('token', None)
         try:
-            data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-            user = User.objects.get(id=data['user_id'])
-            subject = data["subject"]
-            if subject == "New Account":
-                if not user.is_verified:
-                    user.is_verified = True
-                    user.save()
-                    return Response({"message": "Account verified successfully"}, status=status.HTTP_200_OK)
-                else:
-                    return Response({"message": "Already activated"})
-            elif subject == "Forgot Password":
-                return Response({"user_id":user.id}, status.HTTP_200_OK)
+            decoded_data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            serializer = self.serializer_class(data={'email': decoded_data['email'], 'password': decoded_data['password']})
+            
+            if serializer.is_valid():
+                serializer.save()
+                token = serializer.instance.get_token()
+                return Response(token , status.HTTP_200_OK)
+            else:
+                return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+
         except jwt.ExpiredSignatureError:
-            return Response({"message": "Token has expired. "}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Link has expired, signIn again."}, status=status.HTTP_406_NOT_ACCEPTABLE)
         except jwt.DecodeError:
-            return Response({"message": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Invalid token"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
-@extend_schema(request=RegisterSerializer, description='Login Using Email-Pass to get Token', responses={
-            200: OpenApiResponse(response=OpenApiTypes.STR , description='A JWT Token'),
-            404: OpenApiResponse(response=OpenApiTypes.STR , description='Error Message')
-        })
-class LoginAPIView(APIView):
+class SignUpAPIView(GenericAPIView):
+    '''
+    Enter Your Email-Password and click on the received link on mail to create account. 
+    '''
     permission_classes = (AllowAny,)
-    
-    # login using email pass, if valid return token else error mssg
+    serializer_class = SignUpSerializer # helps in schema generation + verifies that email provided is valid + verifies if user already exists 
+
     def post(self, request):
-        email = request.data['email']
-        password = request.data['password']
+        serializer = self.serializer_class(data=request.data)
 
-        user = authenticate(email=email, password=password)
-        print(user)
-        if user is not None:
-            token = user.get_token()
-            return Response(token, status.HTTP_200_OK)
+        if serializer.is_valid():
+            data = serializer.validated_data
+
+            token = jwt.encode(
+                {"email": data['email'],"password":data["password"], "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=86400),},
+                settings.SECRET_KEY, algorithm="HS256")
+
+            current_site = get_current_site(request).domain
+            relative_link = "/register/"
+            abs_url = 'https://' + current_site + relative_link + "?token=" + str(token)
+
+            email_body = 'Hi ' + data['email'] + ' Click the below link to confirm your account ' + abs_url
+            mail = {
+                'email_subject': "Verify Mail",
+                'email_body': email_body,
+                'email': data["email"]
+            }
+            return Response({"message":"Check your mail", 'mail': mail}, status=status.HTTP_200_OK)
         else:
-            return Response({"Message":"Invalid email/Pass"}, status.HTTP_404_NOT_FOUND)
+            return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
 
-class ForgotPasswordAPIView(APIView):
+class LoginAPIView(GenericAPIView):
+    '''
+    login using email pass, if valid return token else error message
+    '''
+    permission_classes = (AllowAny,)
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            user = authenticate(email=serializer.validated_data['email'], password=serializer.validated_data['password'])
+            print(user)
+            if user is None:
+                return Response({"Message":"Invalid email/Pass"}, status.HTTP_400_BAD_REQUEST)
+            else:
+                token = user.get_token()
+                return Response(token, status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+
+class ForgotPasswordAPIView(GenericAPIView):
     permission_classes = [AllowAny,]
+    serializer_class = ForgotPasswordSerializer
 
     def post(self, request):
-        email = request.data['email']
-        user = User.objects.filter(email=email)[0]
-        if user:
-            # send a link via mail which takes user to put method
-            data = create_email(self.request ,user, "Forgot Password")
-            # send_mail()
-            print(data)
-            return Response({"Message":"Check Your Mail"}, status.HTTP_200_OK)
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            data = serializer.validated_data
+            user = User.objects.filter(email=data['email'])[0]
+            if user:
+                # send a link via mail which takes user to put method
+                token = jwt.encode(
+                    {"user_id": user.id, "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=86400),},
+                    settings.SECRET_KEY, algorithm="HS256")
+
+                current_site = get_current_site(request).domain
+                relative_link = "/reset"
+                abs_url = 'https://' + current_site + relative_link + "?token=" + str(token)
+
+                email_body = 'Hi ' + data['email'] + ' Click the below link to reset password ' + abs_url
+                mail = {
+                    'email_subject': "Reset Password",
+                    'email_body': email_body,
+                    'email': data["email"]
+                }
+                return Response({"message":"Check your mail", 'mail': mail}, status=status.HTTP_200_OK)
+            else:
+                return Response({"Message":"No user is registered with that mail"}, status.HTTP_204_NO_CONTENT)
         else:
-            return Response({"Message":"No user is registered with that mail"}, status.HTTP_204_NO_CONTENT)
+            return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+ 
+    @extend_schema(parameters=[
+        OpenApiParameter('token', type=OpenApiTypes.STR, required=True)
+    ])
+    def get(self, request):
+        token = request.GET.get('token', None)
+        try:
+            decoded_data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+            serializer = self.serializer_class(data={'user_id': decoded_data['user_id']})
+            
+            if serializer.is_valid():
+                secret_msg = settings.SECRET_KEY
+                return Response({'user_id':serializer.validated_data['user_id'], 'secret_code':secret_msg}, status.HTTP_200_OK) # take this user id and redirect to 'PUT' with new_password for update
+            else:
+                return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+
+        except jwt.ExpiredSignatureError:
+            return Response({"message": "Link has expired, Try again."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+        except jwt.DecodeError:
+            return Response({"message": "Invalid token"}, status=status.HTTP_406_NOT_ACCEPTABLE)
 
     def put(self, request):
-        new_password = request.data["password"]
-        user_id = request.data["user_id"]
-        print(new_password)
-        print(user_id)
-        user = User.objects.get(id=user_id)
-        user.set_password(new_password)
-        user.save()
-        return Response({"message":"password changed"}, status.HTTP_200_OK)
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            data = serializer.validated_data
+            secret_code = data['secret_code']
+
+            if secret_code != settings.SECRET_KEY:
+                return Response({"message":"Invalid Secret Code"}, status.HTTP_403_FORBIDDEN)
+
+            user = User.objects.get(id=data["user_id"])
+            user.set_password(data["new_password"])
+            user.save()
+            return Response({"message":"password changed"}, status.HTTP_200_OK)
+        else:   
+            return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
 
 class LogoutAPIView(APIView):
     pass
