@@ -2,7 +2,7 @@ from django.db import models
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import  PermissionsMixin
-# from django.core.validators import MinLengthValidator
+from django.core.validators import MinLengthValidator
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None):
@@ -27,7 +27,7 @@ class CustomUserManager(BaseUserManager):
         
 
 class User(AbstractBaseUser, PermissionsMixin):
-    # username = models.CharField(max_length=12, unique=True, db_index=True, validators=[MinLengthValidator(3,"Minimum Lenth should be 3")])
+    name = models.CharField(max_length=25, null=False, blank=False, validators=[MinLengthValidator(3,"Minimum Lenth should be 3")])
     email = models.EmailField(unique=True)
 
     # Fields used by the Django admin.
@@ -37,6 +37,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = 'email'
 
     objects = CustomUserManager()
+
+    def save(self, *args, **kwargs):
+        if not self.name:
+            self.name = str(self.email)[:5]
+        super(User, self).save(*args, **kwargs)
 
     def get_token(self):
         refresh = RefreshToken.for_user(self)
