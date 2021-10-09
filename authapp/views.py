@@ -1,19 +1,16 @@
-from os import stat
-from drf_spectacular.types import OpenApiTypes
 import jwt, datetime
-
 from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView
 from Carpool import settings
-from django.urls import reverse
 from django.contrib.sites.shortcuts import get_current_site
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.response import Response
 from .models import User
 from django.contrib.auth import authenticate
 from rest_framework.permissions import AllowAny
 from .serializers import CreateAccountSerializer, ForgotPasswordSerializer, SignUpSerializer, LoginSerializer
-from drf_spectacular.utils import OpenApiExample, extend_schema, OpenApiParameter, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.types import OpenApiTypes
 
 
 class CreateAccountAPIView(GenericAPIView):
