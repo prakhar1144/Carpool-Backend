@@ -1,6 +1,6 @@
-from django.db.models import fields
 from rest_framework import serializers 
 from .models import Ride
+from authapp.models import User
 
 class CreateRideSerializer(serializers.ModelSerializer):
     class Meta:
@@ -8,7 +8,7 @@ class CreateRideSerializer(serializers.ModelSerializer):
         fields = ['destination','departure_time']
 
     def create(self, validated_data):
-        print(self.context['request'].user)
+        # print(self.context['request'].user)
         ride = Ride(
                 admin=self.context['request'].user,
                 destination=validated_data['destination'],
@@ -17,7 +17,18 @@ class CreateRideSerializer(serializers.ModelSerializer):
         ride.save()
         return ride
 
+# https://stackoverflow.com/a/57802461/14264497
+class UserSerializer(serializers.RelatedField):
+    def to_representation(self, value):
+        return value.name
+
+    class Meta:
+        model = User
+        fields = ['name']
+
 class RideSerializer(serializers.ModelSerializer):
+    admin = serializers.CharField(source='admin.name')
+    members = UserSerializer(read_only=True, many=True)
     class Meta:
         model = Ride
         fields = "__all__"
