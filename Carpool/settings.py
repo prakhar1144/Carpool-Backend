@@ -51,9 +51,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_spectacular',
+    'channels',
 
     'authapp',
     'carpoolapp',
+    'chatapp',
 ]
 
 MIDDLEWARE = [
@@ -86,7 +88,17 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'Carpool.wsgi.application'
+# WSGI_APPLICATION = 'Carpool.wsgi.application'
+ASGI_APPLICATION = 'Carpool.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [(env('REDIS_URI'),env('REDIS_PORT'))],
+        },
+    },
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES' : [
