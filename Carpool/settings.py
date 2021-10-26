@@ -88,7 +88,7 @@ TEMPLATES = [
     },
 ]
 
-# WSGI_APPLICATION = 'Carpool.wsgi.application'
+WSGI_APPLICATION = 'Carpool.wsgi.application'
 ASGI_APPLICATION = 'Carpool.asgi.application'
 
 CHANNEL_LAYERS = {
