@@ -17,6 +17,7 @@ class ListRideAPIView(ListAPIView):
     '''
     List of all the rides
     '''
+    authentication_classes = []   
     permission_classes = [AllowAny]
     queryset = Ride.objects.all() # will be queried on the basis of departure time
     serializer_class = RideSerializer
