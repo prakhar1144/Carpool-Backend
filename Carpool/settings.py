@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
     'channels',
+    'rest_framework_simplejwt.token_blacklist',
 
     'authapp',
     'carpoolapp',
@@ -109,8 +110,10 @@ REST_FRAMEWORK = {
 
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=4),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
 
 AUTH_USER_MODEL = 'authapp.User'
