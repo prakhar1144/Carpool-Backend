@@ -1,4 +1,6 @@
+from django import http
 import jwt, datetime
+from rest_framework import permissions
 from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView
 from Carpool import settings
@@ -7,16 +9,18 @@ from rest_framework import status
 from rest_framework.response import Response
 from .models import User
 from django.contrib.auth import authenticate
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from .serializers import CreateAccountSerializer, ForgotPasswordSerializer, SignUpSerializer, LoginSerializer
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
+from rest_framework_simplejwt.tokens import RefreshToken
 
 
 class CreateAccountAPIView(GenericAPIView):
     '''
     Click on the link received on mail after signUp to create an account.
     '''
+    authentication_classes = []
     permission_classes = (AllowAny,)
     queryset = User.objects.all()
     serializer_class = CreateAccountSerializer
@@ -46,6 +50,7 @@ class SignUpAPIView(GenericAPIView):
     '''
     Enter Your Email-Password and click on the received link on mail to create account. 
     '''
+    authentication_classes = []
     permission_classes = (AllowAny,)
     serializer_class = SignUpSerializer # helps in schema generation + verifies that email provided is valid + verifies if user already exists 
 
@@ -62,7 +67,7 @@ class SignUpAPIView(GenericAPIView):
             current_site = get_current_site(request).domain
             relative_link = "/register/"
             abs_url = 'https://' + current_site + relative_link + "?token=" + str(token)
-
+            print(str(token))
             email_body = 'Hi ' + data['email'] + ' Click the below link to confirm your account ' + abs_url
             mail = {
                 'email_subject': "Verify Mail",
@@ -77,6 +82,7 @@ class LoginAPIView(GenericAPIView):
     '''
     login using email pass, if valid return token else error message
     '''
+    authentication_classes = []
     permission_classes = (AllowAny,)
     serializer_class = LoginSerializer
 
@@ -161,4 +167,13 @@ class ForgotPasswordAPIView(GenericAPIView):
             return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
 
 class LogoutAPIView(APIView):
-    pass
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        try:
+            refresh_token = request.data['refresh_token']
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(status=status.HTTP_200_OK)
+        except:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
