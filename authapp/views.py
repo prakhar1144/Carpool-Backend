@@ -72,7 +72,7 @@ class SignUpAPIView(GenericAPIView):
                 'email_body': email_body,
                 'email': data["email"]
             }
-            custom_mail = CustomMailMessage(subject=mail["email_subject"], to=[mail["email"]], from_email='nithfundaeanonymous@gmail.com', body=mail["email_body"])
+            custom_mail = CustomMailMessage(subject=mail["email_subject"], to=[mail["email"]], from_email='prakhar1144@gmail.com', body=mail["email_body"])
             custom_mail.send()
             return Response({"message":"Check your mail", 'mail': mail}, status=status.HTTP_200_OK)
         else:
@@ -125,7 +125,7 @@ class ForgotPasswordAPIView(GenericAPIView):
                     'email_body': email_body,
                     'email': data["email"]
                 }
-                custom_mail = CustomMailMessage(subject=mail["email_subject"], to=[mail["email"]], from_email='nithfundaeanonymous@gmail.com', body=mail["email_body"])
+                custom_mail = CustomMailMessage(subject=mail["email_subject"], to=[mail["email"]], from_email='prakhar1144@gmail.com', body=mail["email_body"])
                 custom_mail.send()
                 return Response({"message":"Check your mail", 'mail': mail}, status=status.HTTP_200_OK)
             else:
