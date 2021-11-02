@@ -3,7 +3,7 @@ import jwt, datetime
 from rest_framework import permissions
 from rest_framework.views import APIView
 from rest_framework.generics import GenericAPIView
-from Carpool import settings
+from Carpool import mailer, settings
 from django.contrib.sites.shortcuts import get_current_site
 from rest_framework import status
 from rest_framework.response import Response
@@ -14,7 +14,7 @@ from .serializers import CreateAccountSerializer, ForgotPasswordSerializer, Sign
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
 from rest_framework_simplejwt.tokens import RefreshToken
-
+from Carpool.mailer import CustomMailMessage
 
 class CreateAccountAPIView(GenericAPIView):
     '''
@@ -64,9 +64,7 @@ class SignUpAPIView(GenericAPIView):
                 {"email": data['email'],"password":data["password"], "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=86400),},
                 settings.SECRET_KEY, algorithm="HS256")
 
-            current_site = get_current_site(request).domain
-            relative_link = "/register/"
-            abs_url = 'https://' + current_site + relative_link + "?token=" + str(token)
+            abs_url = 'https://carpool-app.netlify.app/'  + "verify/" + "?token=" + str(token)
             print(str(token))
             email_body = 'Hi ' + data['email'] + ' Click the below link to confirm your account ' + abs_url
             mail = {
@@ -74,6 +72,8 @@ class SignUpAPIView(GenericAPIView):
                 'email_body': email_body,
                 'email': data["email"]
             }
+            custom_mail = CustomMailMessage(subject=mail["email_subject"], to=[mail["email"]], from_email='nithfundaeanonymous@gmail.com', body=mail["email_body"])
+            custom_mail.send()
             return Response({"message":"Check your mail", 'mail': mail}, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
@@ -100,23 +100,24 @@ class LoginAPIView(GenericAPIView):
             return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
 
 class ForgotPasswordAPIView(GenericAPIView):
+    authentication_classes = []
     permission_classes = [AllowAny,]
     serializer_class = ForgotPasswordSerializer
 
+    # Input Argument : email
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
-            user = User.objects.filter(email=data['email'])[0]
+            user = User.objects.filter(email=data['email'])
             if user:
-                # send a link via mail which takes user to put method
+                # send a link via mail which takes user to get method
                 token = jwt.encode(
-                    {"user_id": user.id, "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=86400),},
+                    {"user_id": user[0].id, "secret_key": settings.SECRET_KEY, "exp": datetime.datetime.utcnow() + datetime.timedelta(seconds=86400),},
                     settings.SECRET_KEY, algorithm="HS256")
 
-                current_site = get_current_site(request).domain
-                relative_link = "/reset"
-                abs_url = 'https://' + current_site + relative_link + "?token=" + str(token)
+                print(str(token))
+                abs_url = 'https://carpool-app.netlify.app/' + "newpassword/" + "?token=" + str(token)
 
                 email_body = 'Hi ' + data['email'] + ' Click the below link to reset password ' + abs_url
                 mail = {
@@ -124,50 +125,42 @@ class ForgotPasswordAPIView(GenericAPIView):
                     'email_body': email_body,
                     'email': data["email"]
                 }
+                custom_mail = CustomMailMessage(subject=mail["email_subject"], to=[mail["email"]], from_email='nithfundaeanonymous@gmail.com', body=mail["email_body"])
+                custom_mail.send()
                 return Response({"message":"Check your mail", 'mail': mail}, status=status.HTTP_200_OK)
             else:
                 return Response({"Message":"No user is registered with that mail"}, status.HTTP_204_NO_CONTENT)
         else:
             return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
  
-    @extend_schema(parameters=[
-        OpenApiParameter('token', type=OpenApiTypes.STR, required=True)
-    ])
-    def get(self, request):
-        token = request.GET.get('token', None)
-        try:
-            decoded_data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-            serializer = self.serializer_class(data={'user_id': decoded_data['user_id']})
-            
-            if serializer.is_valid():
-                secret_msg = settings.SECRET_KEY
-                return Response({'user_id':serializer.validated_data['user_id'], 'secret_code':secret_msg}, status.HTTP_200_OK) # take this user id and redirect to 'PUT' with new_password for update
-            else:
-                return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
-
-        except jwt.ExpiredSignatureError:
-            return Response({"message": "Link has expired, Try again."}, status=status.HTTP_406_NOT_ACCEPTABLE)
-        except jwt.DecodeError:
-            return Response({"message": "Invalid token"}, status=status.HTTP_406_NOT_ACCEPTABLE)
-
+    # Input argument : secret_code + new_password
     def put(self, request):
         serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
-            secret_code = data['secret_code']
+            token = data['secret_code']
+            try:
+                decoded_data = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+                
+                if decoded_data['secret_key'] != settings.SECRET_KEY:
+                    return Response({"message":"Invalid Secret Code"}, status.HTTP_403_FORBIDDEN)
 
-            if secret_code != settings.SECRET_KEY:
-                return Response({"message":"Invalid Secret Code"}, status.HTTP_403_FORBIDDEN)
+                user = User.objects.get(id=decoded_data["user_id"])
+                user.set_password(data["new_password"])
+                user.save()
+                return Response({"message":"password changed"}, status.HTTP_200_OK)
 
-            user = User.objects.get(id=data["user_id"])
-            user.set_password(data["new_password"])
-            user.save()
-            return Response({"message":"password changed"}, status.HTTP_200_OK)
+            except jwt.ExpiredSignatureError:
+                return Response({"message": "Link has expired, Try again."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+            except jwt.DecodeError:
+                return Response({"message": "Invalid token"}, status=status.HTTP_406_NOT_ACCEPTABLE)
         else:   
             return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
 
 class LogoutAPIView(APIView):
-    permission_classes = (IsAuthenticated,)
+
+    authentication_classes = []
+    permission_classes = (AllowAny,)
 
     def post(self, request):
         try:
