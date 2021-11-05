@@ -15,16 +15,17 @@ class CreateRideSerializer(serializers.ModelSerializer):
                 departure_time=validated_data['departure_time']
             )
         ride.save()
+        ride.members.add(self.context['request'].user)
         return ride
 
 # https://stackoverflow.com/a/57802461/14264497
 class UserSerializer(serializers.RelatedField):
     def to_representation(self, value):
-        return value.name
+        return value.id
 
     class Meta:
         model = User
-        fields = ['name']
+        fields = ['id']
 
 class RideSerializer(serializers.ModelSerializer):
     admin = serializers.CharField(source='admin.name')
@@ -41,6 +42,9 @@ class UpdateRideSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         print(self.context)
-        print(instance)
-        instance.members.add(validated_data['current_user'])
+        print(instance.members.filter(id=validated_data['current_user'].id).exists())
+        if instance.members.filter(id=validated_data['current_user'].id).exists():
+            instance.members.remove(validated_data['current_user'])
+        else:
+            instance.members.add(validated_data['current_user'])
         return instance

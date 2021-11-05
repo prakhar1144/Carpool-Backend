@@ -37,6 +37,7 @@ class CreateAccountAPIView(GenericAPIView):
             if serializer.is_valid():
                 serializer.save()
                 token = serializer.instance.get_token()
+                token["user_id"] = serializer.instance.id
                 return Response(token , status.HTTP_200_OK)
             else:
                 return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
@@ -95,6 +96,7 @@ class LoginAPIView(GenericAPIView):
                 return Response({"Message":"Invalid email/Pass"}, status.HTTP_400_BAD_REQUEST)
             else:
                 token = user.get_token()
+                token["user_id"] = user.id
                 return Response(token, status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
